@@ -3,3 +3,22 @@ title: "spotify"
 format: html
 ---
 
+# Filter out year of 2017
+df <- renoweather |>
+  filter(year(date) == 2017)
+
+# Convert data to average temperature by weeks
+df_weekly <- df |>
+  mutate(
+    date = ymd(date),
+    week = isoweek(date),
+    year = year(date),
+    tavg = (tmax + tmin) /2
+    ) |>
+  group_by(year, week) |>
+  summarize(
+    avg_tmax = mean(tmax, na.rm=TRUE),
+    avg_tmin = mean(tmin, na.rm=TRUE),
+    avg_tavg = mean(tavg, na.rm=TRUE),
+    .groups = "drop"
+    )
