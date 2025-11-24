@@ -3,6 +3,7 @@ title: "spotify"
 format: html
 ---
 
+<!-- data setup needed -->
 # Filter out year of 2017
 df <- renoweather |>
   filter(year(date) == 2017)
