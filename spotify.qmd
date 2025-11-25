@@ -3,23 +3,20 @@ title: "spotify"
 format: html
 ---
 
-<!-- data setup needed -->
-# Filter out year of 2017
-df <- renoweather |>
-  filter(year(date) == 2017)
+# Spotify data
+```{r}
+# There are 1 million playlist in the main dataset
+# spotify_mpd_01.RData: 0.1% of the main dataset
+# spotify_mpd_001.RData: 0.001% of the main dataset
+# We will start with 001 for now
 
-# Convert data to average temperature by weeks
-df_weekly <- df |>
-  mutate(
-    date = ymd(date),
-    week = isoweek(date),
-    year = year(date),
-    tavg = (tmax + tmin) /2
-    ) |>
-  group_by(year, week) |>
-  summarize(
-    avg_tmax = mean(tmax, na.rm=TRUE),
-    avg_tmin = mean(tmin, na.rm=TRUE),
-    avg_tavg = mean(tavg, na.rm=TRUE),
-    .groups = "drop"
-    )
+# load("spotify_mpd_01.RData")
+load("spotify_mpd_001.RData")
+
+```
+
+# 
+```{r}
+playlist
+```
+
