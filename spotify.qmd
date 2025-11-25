@@ -2,6 +2,11 @@
 title: "spotify"
 format: html
 ---
+# Library
+```{r}
+library(tidyverse)
+library(dplyr)
+```
 
 # Spotify data
 ```{r}
@@ -10,13 +15,29 @@ format: html
 # spotify_mpd_001.RData: 0.001% of the main dataset
 # We will start with 001 for now
 
-# load("spotify_mpd_01.RData")
-load("spotify_mpd_001.RData")
+load("spotify_mpd_01.RData")
+# load("spotify_mpd_001.RData")
 
 ```
 
-# 
+# track_attr
+- The `track_attr` table contains information about the audio features of each track.
+- These are computed by Spotify using signal processing and machine learning.
 ```{r}
 track_attr
+colnames(track_attr)
+```
+
+#Select 3 songs
+```{r}
+user_input <- track_attr |> 
+  filter(track_id %in% c(1004300, 644949, 2188242))
+
+user_input
+```
+
+
+```{r}
+
 ```
 
