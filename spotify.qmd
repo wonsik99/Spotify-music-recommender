@@ -17,6 +17,6 @@ load("spotify_mpd_001.RData")
 
 # 
 ```{r}
-playlist
+track_attr
 ```
 
