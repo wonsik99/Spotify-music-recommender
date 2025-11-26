@@ -6,6 +6,8 @@ format: html
 ```{r}
 library(tidyverse)
 library(dplyr)
+library(ggplot2)
+library(shiny)
 ```
 
 # Spotify data
@@ -27,17 +29,52 @@ load("spotify_mpd_01.RData")
 track_attr
 colnames(track_attr)
 ```
+# filter cols, NA 
+```{r}
+new_track_attr <- track_attr |> 
+  select(track_id, artists, track_name, danceability, energy, loudness,
+         acousticness, valence, tempo, track_genre) |>
+  drop_na()
+
+new_track_attr
+```
 
 #Select 3 songs
 ```{r}
-user_input <- track_attr |> 
+user_input <- new_track_attr |> 
   filter(track_id %in% c(1004300, 644949, 2188242))
 
 user_input
 ```
 
+# lm model
+```{r}
+train_data <- new_track_attr %>%
+  mutate(liked = ifelse(track_id %in% user_input$track_id, 1, 0))
+
+train_data
+
+preference_model <- lm(liked ~ danceability + energy + loudness + acousticness + valence + tempo,
+                       data = train_data)
+
+preference_model |> summary()
+
+
+```
+
 
 ```{r}
+prediction_result <- new_track_attr |>
+  ungroup() |>
+  mutate(predicted_score = predict(preference_model, newdata = new_track_attr)) |>
+  filter(!track_id %in% user_input$track_id) |> # remove input songs
+  arrange(desc(predicted_score)) # order
 
+prediction_result
+
+best_song <- prediction_result[1, ]
+
+print(paste("Recommnedation:", best_song$track_name, "-", best_song$artists))
+print(paste("Predicted score:", round(best_song$predicted_score, 5)))
 ```
 
