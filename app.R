@@ -67,10 +67,18 @@ ui <- fluidPage(
                  h3("Top 10 Recommendations"),
                  DTOutput("resultsTable")
         ),
-        tabPanel("Radar Chart", 
-                 h4("music profile"),
+        tabPanel("Music Profile", 
+                 h4("Music Profile"),
                  uiOutput("chooseResultUi"),
-                 plotOutput("radarCharts")
+                 h4("Compared to Your Songs"),
+                 plotOutput("radarCharts"),
+                 h4("More Info"),
+                 textOutput("artist"),
+                 textOutput("genre"),
+                 textOutput("explicit"),
+                 textOutput("key"),
+                 textOutput("timesig"),
+                 textOutput("duration")
         ),
         tabPanel("Vector DNA", 
                  h4("Feature Vector Comparison (Parallel Coordinates)"),
@@ -187,21 +195,31 @@ server <- function(input, output, session) {
     new_input = input$search_select
     track_attr |> filter(track_id %in% new_input) |> 
       select(track_id, artists, track_name, popularity, danceability, energy, loudness,
-        acousticness, valence, tempo, track_genre)
+        acousticness, valence, tempo, track_genre, key, duration_ms, explicit, 
+        time_signature)
+  })
+  
+  #reactive of result select
+  result_rv = reactive({
+    resultInput = input$resultSelect
+    compared = recommendation_data()$table
+    compared = track_attr |> filter(track_id %in% compared$track_id) |>
+      select(track_id, artists, track_name, popularity, danceability, energy, loudness,
+             acousticness, valence, tempo, track_genre, key, duration_ms, explicit, 
+             time_signature)
+    compared = compared |> filter(track_name == resultInput) #|> select(-liked, -is_genre, -predicted_score, -spotify_url)
+    compared
   })
   
   # radar
   output$radarCharts = renderPlot({
     req(input$resultSelect)
     used_colors = c("red", "lightgreen", "darkgrey", "lightskyblue")
-    resultInput = input$resultSelect
-    compared = recommendation_data()$table
-    compared = track_attr |> filter(track_id %in% compared$track_id) |>
-      select(track_id, artists, track_name, popularity, danceability, energy, loudness,
-             acousticness, valence, tempo, track_genre)
-    compared = compared |> filter(track_name == resultInput) #|> select(-liked, -is_genre, -predicted_score, -spotify_url)
+    compared = result_rv() |> select(-track_genre, key, duration_ms, explicit,
+                                     time_signature)
     #str_split_i(resultInput, " - ", 1))
-    user_input = user_input_rv()
+    user_input = user_input_rv() |> select(-track_genre, key, duration_ms, explicit,
+                                           time_signature)
     compared = rbind(compared, user_input)
     maxes = apply(compared, 2, max)
     maxrow = as.data.frame(t(maxes))
@@ -216,6 +234,45 @@ server <- function(input, output, session) {
     radarchart(compared, pcol = used_colors)
     legend("bottomleft", legend = rownames(compared[-c(1, 2),]),
            bty = "n", pch = 20, col = used_colors)
+  })
+  
+  #Info Outputs
+  output$artist = renderText({
+    req(input$resultSelect)
+    df = result_rv()
+    paste("Artist(s):", str_replace_all(df$artists, ";", " and "))
+  })
+  
+  output$genre = renderText({
+    req(input$resultSelect)
+    df = result_rv()
+    paste("Genre: ", df$track_genre)
+  })
+  
+  output$explicit = renderText({
+    req(input$resultSelect)
+    df = result_rv()
+    paste("Explicit: ", df$explicit)
+  })
+  
+  output$key = renderText({
+    req(input$resultSelect)
+    df = result_rv()
+    numkey = c("C", "C#", "D", "D#", "E", "F", "F#", "G", 
+            "G#", "A", "A#", "B")
+    paste("Key:", as.character(factor(df$key, levels = 1:12, labels = numkey)))
+  })
+  
+  output$timesig = renderText({
+    req(input$resultSelect)
+    df = result_rv()
+    paste0("Time Signature: ", df$time_signature, "/4")
+  })
+  
+  output$duration = renderText({
+    req(input$resultSelect)
+    df = result_rv()
+    paste("Duration:", round((df$duration_ms) / 1000), "s")
   })
   
   # Parallel Coordinates Chart
