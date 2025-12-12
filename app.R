@@ -144,7 +144,7 @@ server <- function(input, output, session) {
           URLencode(paste(track_name, artists), reserved = TRUE)
         ),
         track_name = paste0(
-          '<a href="', spotify_url, '" target="_blank">', track_name, '</a>'
+          '<a href="', spotify_url, '" target="_self">', track_name, '</a>'
         )
       )
     
