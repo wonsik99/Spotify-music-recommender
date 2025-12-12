@@ -6,7 +6,7 @@ A Shiny web application that recommends music based on audio features using cosi
 
 - **Music Recommendation**: Get personalized song recommendations based on your music taste
 - **Interactive Search**: Search and select up to 3 songs from the dataset
-- **Visualizations**: 
+- **Visualizations**:
   - Radar charts comparing recommended songs with your selections
   - Parallel coordinates plot showing feature vectors
 - **Detailed Song Information**: View artist, genre, key, time signature, duration, and more
@@ -46,11 +46,11 @@ Ensure that the data file `spotify_mpd_01.RData` is present in the project direc
 1. Open R or RStudio
 2. Navigate to the project directory:
    ```r
-   setwd("/path/to/Spotify-popularity-analysis")
+   setwd("/path/to/Spotify-music-recommender")
    ```
    Or use the full path:
    ```r
-   setwd("~/Desktop/Spotify-popularity-analysis")
+   setwd("~/Desktop/Spotify-music-recommender")
    ```
 3. Run the application:
    ```r
@@ -69,12 +69,14 @@ Rscript -e "shiny::runApp('app.R')"
 
 1. **Start the App**: Once the app launches, it will open in your default web browser (usually at `http://127.0.0.1:XXXX`)
 
-2. **Select Songs**: 
+2. **Select Songs**:
+
    - In the sidebar, use the search box to find and select 3 songs
    - Type to search by song name or artist
    - You must select exactly 3 songs
 
-3. **Get Recommendations**: 
+3. **Get Recommendations**:
+
    - Click the "Get Recommendation" button
    - View the top 10 recommended songs in the "recommendation result" tab
 
@@ -86,7 +88,7 @@ Rscript -e "shiny::runApp('app.R')"
 ## Project Structure
 
 ```
-Spotify-popularity-analysis/
+Spotify-music-recommender/
 ├── app.R                    # Main Shiny application
 ├── spotify.qmd             # Quarto document with analysis code
 ├── spotify_mpd_01.RData    # Spotify track data (required)
@@ -100,6 +102,7 @@ Spotify-popularity-analysis/
 The recommendation system uses **cosine similarity** to find songs similar to your selections:
 
 1. **Feature Extraction**: Each song is represented by 6 audio features:
+
    - Danceability
    - Energy
    - Loudness
@@ -118,15 +121,18 @@ The recommendation system uses **cosine similarity** to find songs similar to yo
 ## Troubleshooting
 
 ### App won't start
+
 - Make sure all required packages are installed
 - Verify that `spotify_mpd_01.RData` exists in the project directory
 - Check R console for error messages
 
 ### No recommendations appear
+
 - Ensure you've selected exactly 3 songs before clicking "Get Recommendation"
 - Check that the data file loaded correctly (you should see "button ok", "vector ok", "cosine ok" messages in the console)
 
 ### Port already in use
+
 - If you see a port error, close other Shiny apps or specify a different port:
   ```r
   shiny::runApp("app.R", port = 3838)
