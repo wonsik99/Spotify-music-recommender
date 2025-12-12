@@ -2,6 +2,10 @@
 
 A Shiny web application that recommends music based on audio features using cosine similarity. Select 3 songs you like, and the app will recommend 10 similar tracks based on their audio characteristics.
 
+## 🌐 Live Demo
+
+Try the application online: **[https://wonsik99.shinyapps.io/Spotify-music-recommender/](https://wonsik99.shinyapps.io/Spotify-music-recommender/)**
+
 ## Features
 
 - **Music Recommendation**: Get personalized song recommendations based on your music taste
