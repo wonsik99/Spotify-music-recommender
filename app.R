@@ -63,7 +63,7 @@ ui <- fluidPage(
       # plotOutput("radarCharts")
       
       tabsetPanel(
-        tabPanel("Recommendations", 
+        tabPanel("recommendation result", 
                  h3("Top 10 Recommendations"),
                  DTOutput("resultsTable")
         ),
@@ -80,11 +80,11 @@ ui <- fluidPage(
                  textOutput("timesig"),
                  textOutput("duration")
         ),
-        tabPanel("Vector Comparison", 
+        tabPanel("Vector DNA", 
                  h4("Feature Vector Comparison (Parallel Coordinates)"),
                  plotOutput("parCoordPlot"),
-                 #p("Each line represents one song"),
-                 #p("RED: my mean vec, BLUE: rec songs")
+                 p("Each line represents one song"),
+                 p("RED: my mean vec, BLUE: rec songs")
         )
       )
     )
@@ -135,12 +135,14 @@ server <- function(input, output, session) {
     rec_result <- new_track_attr |>
       ungroup() |>
       mutate(similarity_score = cosine_scores) |>
-      filter(!track_id %in% selected_ids) |> 
+      filter(!track_id %in% selected_ids) |>
       arrange(desc(similarity_score)) |>
       head(10) |>
       mutate(
-        spotify_url = paste0("https://open.spotify.com/track/",
-                             URLencode(paste(track_name, artists), reserved = TRUE)),
+        spotify_url = paste0(
+          "https://open.spotify.com/search/",
+          URLencode(paste(track_name, artists), reserved = TRUE)
+        ),
         track_name = paste0(
           '<a href="', spotify_url, '" target="_blank">', track_name, '</a>'
         )
@@ -185,9 +187,8 @@ server <- function(input, output, session) {
   #result dropdown
   output$chooseResultUi = renderUI({
     options = recommendation_data()$table
-    options = inner_join(options, new_track_attr, by = "track_id")
-    #options = new_track_attr |> filter(track_id %in% options$track_id)
-    selectInput("resultSelect", "Select from recommendations: ", choices = options$track_name.y)
+    options = new_track_attr |> filter(track_id %in% options$track_id)
+    selectInput("resultSelect", "Select Result", choices = options$track_name)
     #choices = paste(options$track_name, " - ", options$artists))
   })
   
