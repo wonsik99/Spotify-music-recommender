@@ -187,7 +187,7 @@ server <- function(input, output, session) {
     options = recommendation_data()$table
     options = inner_join(options, new_track_attr, by = "track_id")
     #options = new_track_attr |> filter(track_id %in% options$track_id)
-    selectInput("resultSelect", "Select Result", choices = options$track_name.y)
+    selectInput("resultSelect", "Select from recommendations: ", choices = options$track_name.y)
     #choices = paste(options$track_name, " - ", options$artists))
   })
   
