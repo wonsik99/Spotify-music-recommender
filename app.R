@@ -191,7 +191,7 @@ server <- function(input, output, session) {
   # radar
   output$radarCharts = renderPlot({
     req(input$resultSelect)
-    used_colors = c("red", "green", "blue", "black")
+    used_colors = c("red", "lightgreen", "darkgrey", "lightskyblue")
     resultInput = input$resultSelect
     compared = recommendation_data()$table
     compared = new_track_attr |> filter(track_id %in% compared$track_id)
