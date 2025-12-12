@@ -1,5 +1,7 @@
 library(shiny)
 library(tidyverse)
+library(fmsb)
+library(ggplot2)
 
 load("spotify_mpd_01.RData")
 
@@ -32,17 +34,20 @@ ui <- fluidPage(
     mainPanel(
       h4("You selected:"),
       verbatimTextOutput("selected_value"),
-      h4("Likes"),
-      tableOutput("resultsTable")
+      h4("Recommendations"),
+      tableOutput("resultsTable"), 
+      uiOutput("chooseResultUi")
     )
   )
 )
 
 server = function(input, output) {
+  
   output$selected_value <- renderPrint({
     input$search_select
 })
-  output$resultsTable = renderTable({
+  resultList = reactive({
+    req(input$search_select)
     user_input = new_track_attr |> filter(track_name %in% str_split_i(input$search_select, " - ", 1))
     train_data <- new_track_attr |>
       mutate(liked = ifelse(track_id %in% user_input$track_id, 1, 0)) |>
@@ -56,6 +61,18 @@ server = function(input, output) {
       arrange(desc(predicted_score)) # order
     prediction_result
   })
+  
+  output$resultsTable = renderTable({
+    req(input$search_select)
+    resultList()
+  })
+  
+  
+  output$chooseResultUi = renderUI({
+    options = resultList()
+    selectInput("resultSelect", "Select Result", choices = options$track_name)
+  })
+  
 }
 
 shinyApp(ui, server)
