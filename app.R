@@ -113,7 +113,10 @@ server <- function(input, output, session) {
       arrange(desc(similarity_score)) |>
       head(10) |>
       mutate(
-        spotify_url = paste0("https://open.spotify.com/track/", track_id),
+        spotify_url = paste0(
+          "https://open.spotify.com/search/",
+          URLencode(paste(track_name, artists), reserved = TRUE)
+        ),
         track_name = paste0(
           '<a href="', spotify_url, '" target="_blank">', track_name, '</a>'
         )
