@@ -49,7 +49,6 @@ new_track_attr
 user_input <- new_track_attr |>
   filter(track_id %in% c(644949, 1489302, 717255)) |> ungroup()
 
-#
 
 # random
 # user_input <- new_track_attr |> ungroup() |> sample_n(3)
@@ -129,9 +128,65 @@ head(recommendations, 10)
 ```
 
 
+#cosine simialrity(final model)
+```{r}
+
+# scaling
+normalize <- function(x) {
+  return ((x - min(x, na.rm = TRUE)) / (max(x, na.rm = TRUE) - min(x, na.rm = TRUE)))
+  # return ((x - min(x)) / (max(x) - min(x)))
+}
+
+# scale 0 to 1
+scaled_tracks <- new_track_attr |>
+  ungroup() |>
+  mutate(across(c(danceability, energy, loudness, acousticness, valence, tempo), normalize))
+
+# scaled_tracks
 
 
-#weight
+# target vector
+target_vector <- scaled_tracks |>
+  filter(track_id %in% user_input$track_id) |>
+  select(danceability, energy, loudness, acousticness, valence, tempo) |>
+  colMeans(na.rm = TRUE) #summarise(mean)
+
+# matrix
+track_matrix <- scaled_tracks |>
+  select(danceability, energy, loudness, acousticness, valence, tempo) |>
+  as.matrix()
+
+# dot product
+dot_product <- track_matrix %*% target_vector
+
+# norm
+norm_tracks <- sqrt(rowSums(track_matrix^2))
+norm_target <- sqrt(sum(target_vector^2))
+
+# calculate cosine similarity
+cosine_scores <- as.vector(dot_product / (norm_tracks * norm_target))
+
+# result
+recommendations <- new_track_attr |>
+  ungroup() |>
+  mutate(
+    similarity_score = cosine_scores, 
+    
+    # genre(?)
+    genre_match = track_genre %in% user_input$track_genre,
+    adjusted_similarity = ifelse(genre_match, 
+                                 similarity_score + 0.01, 
+                                 similarity_score)
+  ) |>
+  filter(!track_id %in% user_input$track_id) |> # remove user input
+  arrange(desc(similarity_score)) |>         
+  # group_by(artists) |> slice_head(n = 2) |>
+  head(10)
+
+print(recommendations)
+```
+
+#weight for testing
 ```{r}
 # library(tidyverse)
 # 
@@ -158,65 +213,3 @@ head(recommendations, 10)
 # 
 
 ```
-
-
-```{r}
-target_profile <- user_input |>
-  summarise(
-    target_dance = mean(danceability),
-    target_energy = mean(energy),
-    target_loudness = mean(loudness),
-    target_acoustic = mean(acousticness),
-    target_valence = mean(valence),
-    target_tempo = mean(tempo)
-  )
-
-# formalize
-target_vector <- c(
-  target_profile$target_dance,
-  target_profile$target_energy,
-  target_profile$target_loudness / 100,  # -60 ~ 0 
-  target_profile$target_acoustic,
-  target_profile$target_valence,
-  target_profile$target_tempo / 200      # 0 ~ 200 
-)
-
-# Cosine Similarity func
-cosine_similarity <- function(a, b) {
-  sum(a * b) / (sqrt(sum(a^2)) * sqrt(sum(b^2)))
-}
-
-# Cosine Similarity
-recommendations <- new_track_attr |>
-  ungroup() |>
-  filter(!track_id %in% user_input$track_id) |>
-  rowwise() |>
-  mutate(
-    track_vector = list(c(
-      danceability,
-      energy,
-      loudness / 100,
-      acousticness,
-      valence,
-      tempo / 200
-    )),
-    # Cosine Similarity calculate
-    similarity_score = cosine_similarity(target_vector, unlist(track_vector)),
-    
-    # genre + 0.1
-    genre_match = track_genre %in% user_input$track_genre,
-    adjusted_similarity = ifelse(genre_match, 
-                                 similarity_score + 0.01, 
-                                 similarity_score)
-  ) |>
-  ungroup() |>
-  arrange(desc(similarity_score)) |>
-  # arrange(desc(adjusted_similarity)) |>
-  # group_by(artists) |>
-  # slice_head(n = 2) |>
-  ungroup() 
-
-recommendations
-```
-
-
