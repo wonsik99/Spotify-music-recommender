@@ -69,13 +69,8 @@ ui <- fluidPage(
         ),
         tabPanel("Radar Chart", 
                  h4("music profile"),
+                 uiOutput("chooseResultUi"),
                  plotOutput("radarCharts")
-        ),
-        tabPanel("Vector DNA", 
-                 h4("Feature Vector Comparison (Parallel Coordinates)"),
-                 plotOutput("parCoordPlot"),
-                 p("Each line represents one song"),
-                 p("RED: my mean vec, BLUE: rec songs")
         )
       )
     )
@@ -173,53 +168,45 @@ server <- function(input, output, session) {
   })
 
   
-  # Radar Chart
-  # TODO
-  
-  # Parallel Coordinates Chart
-  output$parCoordPlot <- renderPlot({
-    req(recommendation_data())
-    
-    # data 
-    rec_table <- recommendation_data()$table
-    target_vec <- recommendation_data()$target_profile
-    
-    # my vec
-    target_df <- as.data.frame(t(target_vec)) |>
-      mutate(Type = "My Profile", track_name = "User Average")
-    
-    # 10 recs
-    rec_vectors <- scaled_tracks |>
-      filter(track_id %in% rec_table$track_id) |>
-      select(danceability, energy, loudness, acousticness, valence, tempo, track_name) |>
-      mutate(Type = "Recommended")
-    
-    # merge data
-    plot_data <- bind_rows(target_df, rec_vectors)
-    
-    # pivot_longer(wide -> long)
-    plot_data_long <- plot_data |>
-      pivot_longer(cols = c(danceability, energy, loudness, acousticness, valence, tempo),
-                   names_to = "Feature",
-                   values_to = "Value")
-    
-
-    ggplot(plot_data_long, aes(x = Feature, y = Value, group = track_name, color = Type, size = Type, alpha = Type)) +
-      geom_line() +
-      geom_point() +
-      
-      scale_color_manual(values = c("My Profile" = "red", "Recommended" = "steelblue")) +
-      scale_size_manual(values = c("My Profile" = 2, "Recommended" = 0.8)) +  
-      scale_alpha_manual(values = c("My Profile" = 1, "Recommended" = 0.5)) + 
-      
-      theme_minimal() +
-      ylim(0, 1) +
-      labs(title = "Visualizing Song Vectors",
-           subtitle = "Do the recommended songs follow your taste pattern?",
-           x = "Audio Features",
-           y = "Normalized Value (0-1)") +
-      theme(axis.text.x = element_text(angle = 45, hjust = 1, size = 12, face = "bold"))
+  #result dropdown
+  output$chooseResultUi = renderUI({
+    options = recommendation_data()$table
+    options = new_track_attr |> filter(track_id %in% options$track_id)
+    selectInput("resultSelect", "Select Result", choices = options$track_name)
+    #choices = paste(options$track_name, " - ", options$artists))
   })
+  
+  #reactive value of user input
+  user_input_rv = reactive({
+    new_input = input$search_select
+    new_track_attr |> filter(track_id %in% new_input)
+  })
+  
+  # radar
+  output$radarCharts = renderPlot({
+    req(input$resultSelect)
+    used_colors = c("red", "green", "blue", "black")
+    resultInput = input$resultSelect
+    compared = recommendation_data()$table
+    compared = new_track_attr |> filter(track_id %in% compared$track_id)
+    compared = compared |> filter(track_name == resultInput) #|> select(-liked, -is_genre, -predicted_score, -spotify_url)
+    #str_split_i(resultInput, " - ", 1))
+    user_input = user_input_rv()
+    compared = rbind(compared, user_input)
+    maxes = apply(compared, 2, max)
+    maxrow = as.data.frame(t(maxes))
+    mins = apply(compared, 2, min)
+    minrow = as.data.frame(t(mins))
+    max_min = rbind(maxrow, minrow)
+    #rownames(max_min) = c("Max", "Min")
+    max_min$track_name = c("Max", "Min")
+    compared = rbind(max_min, compared) |> select(track_name, danceability, energy, loudness,  acousticness, valence, tempo) |>
+      mutate(across(-track_name, as.numeric)) |> column_to_rownames("track_name")
+    radarchart(compared, pcol = used_colors)
+    legend("bottomleft", legend = rownames(compared[-c(1, 2),]),
+           bty = "n", pch = 20, col = used_colors)
+  })
+  
 }
 
 shinyApp(ui, server)
