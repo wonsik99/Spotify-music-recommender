@@ -63,7 +63,7 @@ ui <- fluidPage(
       # plotOutput("radarCharts")
       
       tabsetPanel(
-        tabPanel("recommendation result", 
+        tabPanel("Recommendations", 
                  h3("Top 10 Recommendations"),
                  DTOutput("resultsTable")
         ),
@@ -80,11 +80,11 @@ ui <- fluidPage(
                  textOutput("timesig"),
                  textOutput("duration")
         ),
-        tabPanel("Vector DNA", 
+        tabPanel("Vector Comparison", 
                  h4("Feature Vector Comparison (Parallel Coordinates)"),
                  plotOutput("parCoordPlot"),
-                 p("Each line represents one song"),
-                 p("RED: my mean vec, BLUE: rec songs")
+                 #p("Each line represents one song"),
+                 #p("RED: my mean vec, BLUE: rec songs")
         )
       )
     )
