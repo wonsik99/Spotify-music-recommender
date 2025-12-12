@@ -12,28 +12,29 @@ new_track_attr <- track_attr |>
          acousticness, valence, tempo, track_genre) |>
   drop_na()
 
-#normalize function
+# normalize function (min-max scaling)
 normalize <- function(x) {
-  return ((x - min(x, na.rm = TRUE)) / (max(x, na.rm = TRUE) - min(x, na.rm = TRUE)))
-  # return ((x - min(x)) / (max(x) - min(x)))
+  (x - min(x, na.rm = TRUE)) / (max(x, na.rm = TRUE) - min(x, na.rm = TRUE))
 }
 
-#scaled tracks
+# scaled tracks (0~1)
 scaled_tracks <- new_track_attr |>
   ungroup() |>
   mutate(across(c(danceability, energy, loudness, acousticness, valence, tempo), normalize))
 
-# matrix
+# matrix for cosine similarity
 track_matrix <- scaled_tracks |>
   select(danceability, energy, loudness, acousticness, valence, tempo) |>
   as.matrix()
 
-#norm_tracks 
+# L2 norms for each track vector
 norm_tracks <- sqrt(rowSums(track_matrix^2))
 
-#id?
-search_choices <- setNames(new_track_attr$track_id, 
-                           paste(new_track_attr$track_name, "-", new_track_attr$artists))
+# selectize choices (value = track_id, label = "track - artist")
+search_choices <- setNames(
+  new_track_attr$track_id,
+  paste(new_track_attr$track_name, "-", new_track_attr$artists)
+)
 
 ui <- fluidPage(
   titlePanel("Music Recommender"),
@@ -43,25 +44,19 @@ ui <- fluidPage(
       selectizeInput(
         inputId = "search_select",
         label = "Search and Select 3 songs:",
-        choices = NULL, #we will load in server
-        multiple = T, # Set to TRUE for multi-selection
+        choices = NULL,  # load in server
+        multiple = TRUE,
         options = list(
           placeholder = 'Start typing to search...',
           maxItems = 3
         )
       ),
-      actionButton("btn_recommend", "Get Recommendation", class = "btn-primary btn-lg", width = "100%"),
+      actionButton("btn_recommend", "Get Recommendation",
+                   class = "btn-primary btn-lg", width = "100%"),
       uiOutput("warning_msg")
     ),
     
     mainPanel(
-      # h4("You selected:"),
-      # verbatimTextOutput("selected_value"),
-      # h4("Recommendations"),
-      # tableOutput("resultsTable"), 
-      # uiOutput("chooseResultUi"),
-      # plotOutput("radarCharts")
-      
       tabsetPanel(
         tabPanel("recommendation result", 
                  h3("Top 10 Recommendations"),
@@ -78,71 +73,89 @@ ui <- fluidPage(
 
 server <- function(input, output, session) {
   
-  # loading
+  # loading selectize options
   updateSelectizeInput(session, "search_select", choices = search_choices, server = TRUE)
   
   recommendation_data <- eventReactive(input$btn_recommend, {
     
-    cat("button ok\n")
-    
-    # input validation
-    
+    # warning message (only after button click)
     output$warning_msg <- renderUI({
       req(input$btn_recommend)
-      
       if (length(input$search_select) != 3) {
-        div(style = "color: red; font-weight: bold; margin-top: 10px; text-align: center;",
-            paste("Currently selected", length(input$search_select), ". Please select 3 songs"))
-      } 
+        div(
+          style = "color: red; font-weight: bold; margin-top: 10px; text-align: center;",
+          paste("Currently selected", length(input$search_select), ". Please select 3 songs")
+        )
+      }
     })
     
-    req(length(input$search_select) >= 3)
+    # stop if not 3 selected
+    req(length(input$search_select) == 3)
     
-    # user_input
     selected_ids <- input$search_select
     
-    # target vector
+    # user profile vector (mean of 3 selected tracks, scaled space)
     target_vector <- scaled_tracks |>
       filter(track_id %in% selected_ids) |>
       select(danceability, energy, loudness, acousticness, valence, tempo) |>
       colMeans(na.rm = TRUE)
-    
-    cat("vector ok\n")
     
     # cosine similarity
     dot_product <- track_matrix %*% target_vector
     norm_target <- sqrt(sum(target_vector^2))
     cosine_scores <- as.vector(dot_product / (norm_tracks * norm_target))
     
-    cat ("cosine ok\n")
-    
-    # result
+    # recommendation result (top 10)
     rec_result <- new_track_attr |>
       ungroup() |>
       mutate(similarity_score = cosine_scores) |>
-      filter(!track_id %in% selected_ids) |> 
+      filter(!track_id %in% selected_ids) |>
       arrange(desc(similarity_score)) |>
-      head(10)
+      head(10) |>
+      mutate(
+        spotify_url = paste0("https://open.spotify.com/track/", track_id),
+        track_name = paste0(
+          '<a href="', spotify_url, '" target="_blank">', track_name, '</a>'
+        )
+      )
     
-    return(list(table = rec_result, target_profile = target_vector))
+    list(table = rec_result, target_profile = target_vector)
   })
   
-  # text output
-  output$result_text <- renderText({
-    req(recommendation_data()) # wait for button
-    "Top 10 Recommendations"
-  })
-  
-  # table
+  # table output (clickable track_name)
   output$resultsTable <- renderDT({
     req(recommendation_data())
-    datatable(recommendation_data()$table, options = list(pageLength = 10)) |>
-      formatStyle('similarity_score', background = styleColorBar(c(0, 1), 'lightblue'))
+    
+    df <- recommendation_data()$table
+    
+    # hide spotify_url column in DT (0-based indexing)
+    url_col_idx <- which(names(df) == "spotify_url") - 1
+    
+    datatable(
+      df,
+      escape = FALSE,   # IMPORTANT: render <a> as link
+      rownames = FALSE,
+      options = list(
+        pageLength = 10,
+        columnDefs = list(list(targets = url_col_idx, visible = FALSE))
+      )
+    ) |>
+      formatStyle(
+        'similarity_score',
+        background = styleColorBar(c(0, 1), 'lightblue'),
+        backgroundSize = '98% 88%',
+        backgroundRepeat = 'no-repeat',
+        backgroundPosition = 'center'
+      )
   })
   
-  # radar
-  # TODO
+  # radar chart (optional / placeholder)
+  output$radarCharts <- renderPlot({
+    req(recommendation_data())
+    # TODO: 네가 원하면 여기까지 target_profile vs 선택/추천곡 레이더로 이어서 붙여줄게
+    plot.new()
+    text(0.5, 0.5, "Radar chart TODO")
+  })
 }
 
 shinyApp(ui, server)
-  
