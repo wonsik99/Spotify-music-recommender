@@ -185,7 +185,9 @@ server <- function(input, output, session) {
   #reactive value of user input
   user_input_rv = reactive({
     new_input = input$search_select
-    new_track_attr |> filter(track_id %in% new_input)
+    track_attr |> filter(track_id %in% new_input) |> 
+      select(track_id, artists, track_name, popularity, danceability, energy, loudness,
+        acousticness, valence, tempo, track_genre)
   })
   
   # radar
@@ -194,7 +196,9 @@ server <- function(input, output, session) {
     used_colors = c("red", "lightgreen", "darkgrey", "lightskyblue")
     resultInput = input$resultSelect
     compared = recommendation_data()$table
-    compared = new_track_attr |> filter(track_id %in% compared$track_id)
+    compared = track_attr |> filter(track_id %in% compared$track_id) |>
+      select(track_id, artists, track_name, popularity, danceability, energy, loudness,
+             acousticness, valence, tempo, track_genre)
     compared = compared |> filter(track_name == resultInput) #|> select(-liked, -is_genre, -predicted_score, -spotify_url)
     #str_split_i(resultInput, " - ", 1))
     user_input = user_input_rv()
@@ -206,7 +210,8 @@ server <- function(input, output, session) {
     max_min = rbind(maxrow, minrow)
     #rownames(max_min) = c("Max", "Min")
     max_min$track_name = c("Max", "Min")
-    compared = rbind(max_min, compared) |> select(track_name, danceability, energy, loudness,  acousticness, valence, tempo) |>
+    compared = rbind(max_min, compared) |> select(track_name, popularity, danceability, energy, 
+                                                  loudness,  acousticness, valence, tempo) |>
       mutate(across(-track_name, as.numeric)) |> column_to_rownames("track_name")
     radarchart(compared, pcol = used_colors)
     legend("bottomleft", legend = rownames(compared[-c(1, 2),]),
