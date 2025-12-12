@@ -41,16 +41,19 @@ new_track_attr
 
 #Select 3 songs
 ```{r}
-# #acoustic
+# # 3 acoustic
 # user_input <- new_track_attr |>
 #   filter(track_id %in% c(1004300, 644949, 2188242)) |> ungroup()
 
-# 1 acoustic, 2 rock
+# # 1 acoustic, 2 rock
+# user_input <- new_track_attr |>
+#   filter(track_id %in% c(644949, 1489302, 717255)) |> ungroup()
+
+# 3 jazz
 user_input <- new_track_attr |>
-  filter(track_id %in% c(644949, 1489302, 717255)) |> ungroup()
+  filter(track_id %in% c(511395, 1361362, 1146431)) |> ungroup()
 
-
-# random
+# # random
 # user_input <- new_track_attr |> ungroup() |> sample_n(3)
 
 user_input
@@ -73,11 +76,6 @@ preference_model <- glm(liked ~ danceability + energy + loudness + acousticness 
 
 preference_model |> summary()
 
-
-```
-
-
-```{r}
 prediction_result <- train_data |>
   ungroup() |>
   mutate(predicted_score = predict(preference_model, newdata = train_data, type = "response")) |>
@@ -92,6 +90,8 @@ print(paste("Recommnedation:", best_song$track_name, "-", best_song$artists))
 print(paste("Predicted score:", round(best_song$predicted_score, 5)))
 ```
 
+
+# Euclidean
 ```{r}
 target_profile <- user_input |>
   summarise(
@@ -130,6 +130,7 @@ head(recommendations, 10)
 
 #cosine simialrity(final model)
 ```{r}
+user_input
 
 # scaling
 normalize <- function(x) {
@@ -137,12 +138,10 @@ normalize <- function(x) {
   # return ((x - min(x)) / (max(x) - min(x)))
 }
 
-# scale 0 to 1
+# scaled_tracks
 scaled_tracks <- new_track_attr |>
   ungroup() |>
   mutate(across(c(danceability, energy, loudness, acousticness, valence, tempo), normalize))
-
-# scaled_tracks
 
 
 # target vector
@@ -170,13 +169,13 @@ cosine_scores <- as.vector(dot_product / (norm_tracks * norm_target))
 recommendations <- new_track_attr |>
   ungroup() |>
   mutate(
-    similarity_score = cosine_scores, 
+    similarity_score = cosine_scores 
     
-    # genre(?)
-    genre_match = track_genre %in% user_input$track_genre,
-    adjusted_similarity = ifelse(genre_match, 
-                                 similarity_score + 0.01, 
-                                 similarity_score)
+    # # genre(?)
+    # genre_match = track_genre %in% user_input$track_genre,
+    # adjusted_similarity = ifelse(genre_match, 
+    #                              similarity_score + 0.01, 
+    #                              similarity_score)
   ) |>
   filter(!track_id %in% user_input$track_id) |> # remove user input
   arrange(desc(similarity_score)) |>         
