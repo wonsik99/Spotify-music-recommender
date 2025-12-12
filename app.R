@@ -2,111 +2,147 @@ library(shiny)
 library(tidyverse)
 library(fmsb)
 library(ggplot2)
+library(DT)
 
 load("spotify_mpd_01.RData")
 
+# filter cols, NA 
 new_track_attr <- track_attr |> 
   select(track_id, artists, track_name, danceability, energy, loudness,
          acousticness, valence, tempo, track_genre) |>
   drop_na()
 
+#normalize function
+normalize <- function(x) {
+  return ((x - min(x, na.rm = TRUE)) / (max(x, na.rm = TRUE) - min(x, na.rm = TRUE)))
+  # return ((x - min(x)) / (max(x) - min(x)))
+}
 
+#scaled tracks
+scaled_tracks <- new_track_attr |>
+  ungroup() |>
+  mutate(across(c(danceability, energy, loudness, acousticness, valence, tempo), normalize))
+
+# matrix
+track_matrix <- scaled_tracks |>
+  select(danceability, energy, loudness, acousticness, valence, tempo) |>
+  as.matrix()
+
+#norm_tracks 
+norm_tracks <- sqrt(rowSums(track_matrix^2))
+
+#id?
+search_choices <- setNames(new_track_attr$track_id, 
+                           paste(new_track_attr$track_name, "-", new_track_attr$artists))
 
 ui <- fluidPage(
-  titlePanel("Search Bar with Dropdown Example"),
+  titlePanel("Music Recommender"),
   
   sidebarLayout(
     sidebarPanel(
-      # Use selectizeInput for the search/dropdown functionality
       selectizeInput(
         inputId = "search_select",
-        label = "Search and Select an Option:",
-        choices = c("", paste(track_attr$track_name, "-", track_attr$artists)), # 'state.name' is a built-in R dataset
-        selected = "",
+        label = "Search and Select 3 songs:",
+        choices = NULL, #we will load in server
         multiple = T, # Set to TRUE for multi-selection
         options = list(
           placeholder = 'Start typing to search...',
-          onInitialize = I('function() { this.setValue(""); }'), 
           maxItems = 3
         )
-      )
+      ),
+      actionButton("btn_recommend", "Get Recommendation", class = "btn-primary btn-lg", width = "100%"),
+      uiOutput("warning_msg")
     ),
     
     mainPanel(
-      h4("You selected:"),
-      verbatimTextOutput("selected_value"),
-      h4("Recommendations"),
-      tableOutput("resultsTable"), 
-      uiOutput("chooseResultUi"),
-      plotOutput("radarCharts")
+      # h4("You selected:"),
+      # verbatimTextOutput("selected_value"),
+      # h4("Recommendations"),
+      # tableOutput("resultsTable"), 
+      # uiOutput("chooseResultUi"),
+      # plotOutput("radarCharts")
+      
+      tabsetPanel(
+        tabPanel("recommendation result", 
+                 h3("Top 10 Recommendations"),
+                 DTOutput("resultsTable")
+        ),
+        tabPanel("Radar Chart", 
+                 h4("music profile"),
+                 plotOutput("radarCharts")
+        )
+      )
     )
   )
 )
 
-server = function(input, output) {
+server <- function(input, output, session) {
   
-  output$selected_value <- renderPrint({
-    input$search_select
-})
+  # loading
+  updateSelectizeInput(session, "search_select", choices = search_choices, server = TRUE)
   
-  user_input_rv = reactive({
-    new_track_attr |> filter(track_name %in% str_split_i(input$search_select, " - ", 1))
-  })
-  
-  #Stores the actual model
-  resultList = reactive({
-    req(input$search_select)
-    user_input = user_input_rv()
-    train_data <- new_track_attr |>
-      mutate(liked = ifelse(track_id %in% user_input$track_id, 1, 0)) |>
-      mutate(is_genre = ifelse(track_genre %in% user_input$track_genre, 1, 0))
-    preference_model <- glm(liked ~ danceability + energy + loudness + acousticness + valence + tempo + is_genre,
-                            data = train_data, family = binomial)
-    prediction_result <- train_data |>
+  recommendation_data <- eventReactive(input$btn_recommend, {
+    
+    cat("button ok\n")
+    
+    # input validation
+    
+    output$warning_msg <- renderUI({
+      req(input$btn_recommend)
+      
+      if (length(input$search_select) != 3) {
+        div(style = "color: red; font-weight: bold; margin-top: 10px; text-align: center;",
+            paste("Currently selected", length(input$search_select), ". Please select 3 songs"))
+      } 
+    })
+    
+    req(length(input$search_select) >= 3)
+    
+    # user_input
+    selected_ids <- input$search_select
+    
+    # target vector
+    target_vector <- scaled_tracks |>
+      filter(track_id %in% selected_ids) |>
+      select(danceability, energy, loudness, acousticness, valence, tempo) |>
+      colMeans(na.rm = TRUE)
+    
+    cat("vector ok\n")
+    
+    # cosine similarity
+    dot_product <- track_matrix %*% target_vector
+    norm_target <- sqrt(sum(target_vector^2))
+    cosine_scores <- as.vector(dot_product / (norm_tracks * norm_target))
+    
+    cat ("cosine ok\n")
+    
+    # result
+    rec_result <- new_track_attr |>
       ungroup() |>
-      mutate(predicted_score = predict(preference_model, newdata = train_data, type = "response")) |>
-      filter(!track_id %in% user_input$track_id) |> top_n(10, predicted_score) |> # remove input songs
-      arrange(desc(predicted_score)) # order
-    prediction_result
+      mutate(similarity_score = cosine_scores) |>
+      filter(!track_id %in% selected_ids) |> 
+      arrange(desc(similarity_score)) |>
+      head(10)
+    
+    return(list(table = rec_result, target_profile = target_vector))
   })
   
-  output$resultsTable = renderTable({
-    req(input$search_select)
-    resultList()
+  # text output
+  output$result_text <- renderText({
+    req(recommendation_data()) # wait for button
+    "Top 10 Recommendations"
   })
   
-  
-  output$chooseResultUi = renderUI({
-    options = resultList()
-    selectInput("resultSelect", "Select Result", choices = options$track_name)
-                #choices = paste(options$track_name, " - ", options$artists))
+  # table
+  output$resultsTable <- renderDT({
+    req(recommendation_data())
+    datatable(recommendation_data()$table, options = list(pageLength = 10)) |>
+      formatStyle('similarity_score', background = styleColorBar(c(0, 1), 'lightblue'))
   })
   
-  output$radarCharts = renderPlot({
-    req(input$resultSelect)
-    used_colors = c("red", "green", "blue", "black")
-    resultInput = input$resultSelect
-    compared = resultList()
-    compared = compared |> filter(track_name == resultInput) |> select(-liked, -is_genre, -predicted_score)
-                                      #str_split_i(resultInput, " - ", 1))
-    user_input = user_input_rv()
-    compared = rbind(compared, user_input)
-    maxes = apply(compared, 2, max)
-    maxrow = as.data.frame(t(maxes))
-    mins = apply(compared, 2, min)
-    minrow = as.data.frame(t(mins))
-    max_min = rbind(maxrow, minrow)
-    #rownames(max_min) = c("Max", "Min")
-    max_min$track_name = c("Max", "Min")
-    compared = rbind(max_min, compared) |> select(track_name, danceability, energy, loudness,  acousticness, valence, tempo) |>
-      mutate(across(-track_name, as.numeric)) |> column_to_rownames("track_name")
-    radarchart(compared, pcol = used_colors)
-    legend(x = "left", legend = rownames(compared[-c(1, 2),]),
-           bty = "n", pch = 20, col = used_colors)
-  })
-  
-  
+  # radar
+  # TODO
 }
 
 shinyApp(ui, server)
-
+  
